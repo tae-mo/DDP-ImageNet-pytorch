@@ -104,7 +104,7 @@ if __name__ == "__main__":
     world_size = 8
     args = parse_args()
 
-    os.makedirs(args.exp, exist_ok=True)
+    os.makedirs(os.path.join("./exp", args.exp), exist_ok=True)
     
     mp.spawn(
         main,
