@@ -68,6 +68,7 @@ def main(rank, world_size, args):
     criterion = nn.CrossEntropyLoss()
     
     best_acc, best_loss = 0., float("inf")
+    best_acc_epoch, best_loss_epoch = 0, 0
     for epoch in range(args.epochs):
         # we have to tell DistributedSampler which epoch this is
         # and guarantees a different shuffling order
@@ -77,19 +78,23 @@ def main(rank, world_size, args):
             epoch_acc, epoch_loss = valid(model, val_loader, criterion, rank, args)
             print(f"EPOCH {epoch}: acc = {epoch_acc}, loss = {epoch_loss}")
             if epoch_acc > best_acc:
+                os.system(f"rm resnet50_bestACC_epoch{best_acc_epoch+1}")
                 save_ckpt({
                     "epoch": epoch+1,
-                    "state_dict": model.state_dict(),
+                    "state_dict": model.module.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scheduler": scheduler.state_dict(),
                 }, file_name=os.path.join(args.exp, f"resnet50_bestACC_epoch{epoch+1}"))
+                best_acc_epoch = epoch
             if epoch_loss < best_loss:
+                os.system(f"rm resnet50_bestACC_epoch{best_loss_epoch+1}")
                 save_ckpt({
                     "epoch": epoch+1,
-                    "state_dict": model.state_dict(),
+                    "state_dict": model.module.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scheduler": scheduler.state_dict(),
                 }, file_name=os.path.join(args.exp, f"resnet50_bestLOSS_epoch{epoch+1}"))
+                best_loss_epoch = epoch
         scheduler.step()
     cleanup()
     
@@ -98,10 +103,10 @@ def main(rank, world_size, args):
 TODO:
 - add world_size & local_rank in argument
 - consider batch size in ddp and clarify the saving policy
-- 
+- remove prev best epoch and update to new one
 """
 if __name__ == "__main__":
-    world_size = 8
+    world_size = 1
     args = parse_args()
 
     os.makedirs(os.path.join("./exp", args.exp), exist_ok=True)
