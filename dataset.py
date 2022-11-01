@@ -35,7 +35,7 @@ class ImageNet(Dataset):
         if self.transforms:
             img = self.transforms(img)
         else:
-            img = T.ToTensor(img)
+            img = T.ToTensor()(img)
             
         if self.phase == "train":
             return img, self.labels[label]
@@ -86,6 +86,12 @@ if __name__ == "__main__":
     
     print(f"sample:\n{sample[0].size, sample[1]}")
         
+        
+        
+        
+        
+
+  
         
         
         
