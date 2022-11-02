@@ -67,17 +67,23 @@ def main(rank, world_size, args):
         # we have to tell DistributedSampler which epoch this is
         # and guarantees a different shuffling order
         train_loader.sampler.set_epoch(epoch)
-        
-        train_loss = train(model, train_loader, criterion, optimizer, rank, args)
-        # dist.all_gather_object([None for _ in range(world_size)], train_loss)
+        train_loss, train_acc = train(model, train_loader, criterion, optimizer, rank, args)
         
         val_acc, val_loss = valid(model, val_loader, criterion, rank, args)
-        g_acc, g_loss = torch.randn(world_size), torch.randn(world_size)
-        dist.all_gather_object(g_acc, val_acc.item())
-        dist.all_gather_object(g_loss, val_loss.item())
+        
+        ## gather
+        ## reason of using ones_like: 
+        ## the container's value should be on the same device with the value it will contain
+        g_acc = [torch.ones_like(val_acc) for _ in range(world_size)]
+        g_loss = [torch.ones_like(val_loss) for _ in range(world_size)]
+        
+        dist.all_gather(g_acc, val_acc)
+        dist.all_gather(g_loss, val_loss)
         
         if rank == 0:
-            val_acc, val_loss = g_acc.mean(), g_loss.mean()
+            val_acc = torch.stack(g_acc, dim=0)
+            val_loss = torch.stack(g_loss, dim=0)
+            val_acc, val_loss = val_acc.mean(), val_loss.mean()
             print(f"EPOCH {epoch} VALID: acc = {val_acc}, loss = {val_loss}")
             if val_acc > best_acc:
                 save_ckpt({
@@ -108,13 +114,11 @@ def main(rank, world_size, args):
     
 """
 TODO:
-- add world_size & local_rank in argument
 - consider batch size in ddp and clarify the saving policy
-- remove prev best epoch and update to new one
 """
 if __name__ == "__main__":
     args = parse_args()
-    args.local_rank = int(os.environ['LOCAL_RANK'])
+    args.local_rank = int(os.environ['LOCAL_RANK']) # for simplicity
     
     dist.init_process_group("nccl")
 
